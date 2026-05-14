@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { i18nService } from '../../services/i18n';
 import { setIsShowLoginModal, setLoggedIn } from '@/store/slices/authSlice';
 import { clearServerModels } from '@/store/slices/modelSlice';
 import Modal from '../common/Modal';
+import { authService } from '@/services/auth';
 
-const SMS_LOGIN_BASE_URL = 'https://popi.yuanzoo.cn';
 
 type LoginTab = 'sms' | 'password';
 
@@ -24,7 +24,7 @@ const LoginView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     code: '',
     inviteCode: '',
   });
-  
+
   const [passwordForm, setPasswordForm] = useState({
     username: '',
     password: '',
@@ -35,17 +35,13 @@ const LoginView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const fetchCaptcha = async () => {
     setError(null);
     try {
-      const response = await window.electron.api.fetch({
-        url: `${SMS_LOGIN_BASE_URL}/api_client/captcha/gen`,
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      });    
-      if (response.ok && response?.status === 200) {
-        setCaptchaId(response.data.data.id);
-        setCaptchaImage(response.data.data.data);
+      const response = await authService.getCaptcha();
+      if (response.success) {
+        setCaptchaId(response.id);
+        setCaptchaImage(response.imgUrl);
         setVerificationView(true);
       } else {
-        setError(response.data?.message || '获取验证码失败');
+        setError(response?.error || '获取验证码失败');
       }
     } catch (err) {
       setError('获取验证码失败，请稍后重试');
@@ -62,29 +58,29 @@ const LoginView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     setError(null);
 
     try {
-      const response = await window.electron.api.fetch({
-        url: `${SMS_LOGIN_BASE_URL}/api_client/auth/code?phone=${smsForm.phone}&usage=LOGIN&captchaId=${captchaId}&captchaValue=${captchaValue}`,
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+      const sendCodeResponse = await authService.sendSmsCode({
+        phone: smsForm.phone,
+        captchaId,
+        captchaValue
       });
 
-      if (response.ok && response?.status === 200) {
-        setCountdown(60);
-        setVerificationView(false);
-        setCaptchaValue('');
-        const timer = setInterval(() => {
-          setCountdown(prev => {
-            if (prev <= 1) {
-              clearInterval(timer);
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
-      } else {
-        setError(response.data?.message || '发送失败');
-        await fetchCaptcha();
+      if (!sendCodeResponse.success) {
+        setError(sendCodeResponse.error || '发送验证码失败');
+        setLoading(false);
+        return;
       }
+      setCountdown(60);
+      setVerificationView(false);
+      setCaptchaValue('');
+      const timer = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     } catch (err) {
       setError('发送失败，请稍后重试');
       await fetchCaptcha();
@@ -101,50 +97,31 @@ const LoginView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
     setLoading(true);
     setError(null);
-
-    try {
-      const response = await window.electron.api.fetch({
-        url: `${SMS_LOGIN_BASE_URL}/api_client/auth/loginByCode`,
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: smsForm.phone,
-          code: smsForm.code,
-          inviteCode: smsForm.inviteCode,
-        }),
-      });
-
-      if (response.ok && response?.status === 200) {
-        const responseData = response.data.data;
-        const _token = responseData.token;
-        const userData = responseData.user;
-        const user = {
-          id: userData.id,
-          yid: String(userData.id),
-          nickname: userData.name || userData.code || '用户',
-          avatarUrl: userData.avatar || null,
-          phone: userData.phone || null,
-        };
-        const quota = {
-          planName: userData.isMember ? 'VIP' : '免费',
-          subscriptionStatus: userData.isMember ? 'active' : 'free',
-          creditsLimit: userData.memberCoins + userData.otherCoins,
-          creditsUsed: 0,
-          creditsRemaining: userData.memberCoins + userData.otherCoins,
-        };
-        // window.electron.auth.saveToken?.(token);
-        dispatch(setLoggedIn({ user, quota }));
-        dispatch(clearServerModels());
-        onClose();
-        setSmsForm({ phone: '', code: '', inviteCode: '' });
-      } else {
-        setError(response.data?.message || '登录失败');
-      }
-    } catch (err) {
-      setError('登录失败，请稍后重试');
-    } finally {
+    const smsLoginResponse = await authService.smsLogin({ phone: smsForm.phone, code: smsForm.code });
+    if (!smsLoginResponse.success) {
+      setError(smsLoginResponse.error || '登录失败');
       setLoading(false);
+      return;
     }
+    const userData = smsLoginResponse.user;
+    const user = {
+      id: userData.id,
+      yid: String(userData.id),
+      nickname: userData.name || userData.code || '用户',
+      avatarUrl: userData.avatar || null,
+      phone: userData.phone || null,
+    };
+    const quota = {
+      planName: userData.isMember ? 'VIP' : '免费',
+      subscriptionStatus: userData.isMember ? 'active' : 'free',
+      creditsLimit: userData.allCoins,
+      creditsUsed: 0,
+      creditsRemaining: userData.allCoins,
+    };
+    dispatch(setLoggedIn({ user, quota }));
+    dispatch(clearServerModels());
+    onClose();
+    setSmsForm({ phone: '', code: '', inviteCode: '' });
   };
 
   const handlePasswordLogin = async () => {
@@ -156,47 +133,31 @@ const LoginView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     setLoading(true);
     setError(null);
 
-    try {
-      const response = await window.electron.api.fetch({
-        url: `${SMS_LOGIN_BASE_URL}/api_client/auth/login`,
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: passwordForm.username,
-          password: passwordForm.password,
-        }),
-      });  
-      if (response.ok && response?.status === 200) {
-        const responseData = response.data.data;
-        const _token = responseData.token;
-        const userData = responseData.user;
-        const user = {
-          id: userData.id,
-          yid: String(userData.id),
-          nickname: userData.name || userData.code || '用户',
-          avatarUrl: userData.avatar || null,
-          phone: userData.phone || null,
-        };
-        const quota = {
-          planName: userData.isMember ? 'VIP' : '免费',
-          subscriptionStatus: userData.isMember ? 'active' : 'free',
-          creditsLimit: userData.allCoins,
-          creditsUsed: 0,
-          creditsRemaining: userData.allCoins,
-        };
-        // window.electron.auth.saveToken?.(token);
-        dispatch(setLoggedIn({ user, quota }));
-        dispatch(clearServerModels());
-        onClose();
-        setPasswordForm({ username: '', password: '' });
-      } else {
-        setError(response.data?.message || '登录失败');
-      }
-    } catch (err) {
-      setError('登录失败，请稍后重试');
-    } finally {
+    const passwordLoginResponse = await authService.passwordLogin({ email: passwordForm.username, password: passwordForm.password });
+    if (!passwordLoginResponse.success) {
+      setError(passwordLoginResponse.error || '登录失败');
       setLoading(false);
+      return;
     }
+    const userData = passwordLoginResponse.user;
+    const user = {
+      id: userData.id,
+      yid: String(userData.id),
+      nickname: userData.name || userData.code || '用户',
+      avatarUrl: userData.avatar || null,
+      phone: userData.phone || null,
+    };
+    const quota = {
+      planName: userData.isMember ? 'VIP' : '免费',
+      subscriptionStatus: userData.isMember ? 'active' : 'free',
+      creditsLimit: userData.allCoins,
+      creditsUsed: 0,
+      creditsRemaining: userData.allCoins,
+    };
+    dispatch(setLoggedIn({ user, quota }));
+    dispatch(clearServerModels());
+    onClose();
+    setPasswordForm({ username: '', password: '' });
   };
 
   const handleClose = () => {
@@ -205,6 +166,13 @@ const LoginView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     setPasswordForm({ username: '', password: '' });
     dispatch(setIsShowLoginModal(false));
   };
+
+  const sendCode = useCallback(() => {
+    if (captchaValue) {
+      setVerificationView(false);
+      handleSendCode();
+    }
+  }, [captchaValue, captchaId])
 
   return (
     <>
@@ -240,11 +208,10 @@ const LoginView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               setError(null);
               setActiveTab('sms');
             }}
-            className={`flex-1 pb-2 text-sm font-medium transition-colors ${
-              activeTab === 'sms'
-                ? 'text-primary border-b-2 border-primary'
-                : 'text-secondary hover:text-foreground'
-            }`}
+            className={`flex-1 pb-2 text-sm font-medium transition-colors ${activeTab === 'sms'
+              ? 'text-primary border-b-2 border-primary'
+              : 'text-secondary hover:text-foreground'
+              }`}
           >
             短信登录
           </button>
@@ -254,11 +221,10 @@ const LoginView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               setError(null);
               setActiveTab('password');
             }}
-            className={`flex-1 pb-2 text-sm font-medium transition-colors ${
-              activeTab === 'password'
-                ? 'text-primary border-b-2 border-primary'
-                : 'text-secondary hover:text-foreground'
-            }`}
+            className={`flex-1 pb-2 text-sm font-medium transition-colors ${activeTab === 'password'
+              ? 'text-primary border-b-2 border-primary'
+              : 'text-secondary hover:text-foreground'
+              }`}
           >
             账号登录
           </button>
@@ -300,7 +266,7 @@ const LoginView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                   type="button"
                   onClick={async () => {
                     setVerificationView(true)
-                     await fetchCaptcha();
+                    await fetchCaptcha();
                   }}
                   disabled={countdown > 0 || !smsForm.phone || smsForm.phone.length !== 11}
                   className="px-3 py-2 bg-surface-raised border border-border rounded-lg text-sm text-primary hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -376,9 +342,9 @@ const LoginView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             </div>
             <div className="flex flex-col items-center justify-center px-4 gap-4">
               {captchaImage && (
-                <img 
-                  src={captchaImage} 
-                  alt="验证码" 
+                <img
+                  src={captchaImage}
+                  alt="验证码"
                   className="w-full h-24 object-contain bg-white rounded cursor-pointer"
                   onClick={fetchCaptcha}
                 />
@@ -403,12 +369,7 @@ const LoginView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (captchaValue) {
-                      setVerificationView(false);
-                      handleSendCode();
-                    }
-                  }}
+                  onClick={sendCode}
                   disabled={!captchaValue}
                   className="w-full py-2.5 bg-primary text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity border border-border"
                 >

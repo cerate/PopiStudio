@@ -1,0 +1,34 @@
+export interface UserProfile {
+  id: number;
+  code: string;
+  name: string;
+  avatar: string;
+  gender: 0 | 1 | 2;
+  birthday: string;
+  phone: string;
+  email: string;
+  wechat: string;
+  signature: string;
+  country: string;
+  province: string;
+  city: string;
+  isMember: boolean;
+  memberLevel: number;
+  memberCoins: number;
+  otherCoins: number;
+  pointPackageCoins: number;
+  allCoins: number;
+  isUsedCoinsRecently: boolean;
+  power: number;
+  powerConsumed: number;
+  powerRecharged: number;
+  followingNum: number;
+  fansNum: number;
+  likeNum: number;
+  postNum: number;
+  taskNum: number;
+  characterDesignGuide: boolean;
+  status: 0 | 1;
+  createTime: string;
+  updateTime: string;
+}

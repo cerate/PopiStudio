@@ -27,8 +27,8 @@ const isTestMode = (): boolean => {
  */
 export const getServerApiBaseUrl = (): string => {
   return isTestMode()
-    ? 'https://popiai-server.inner.youdao.com'
-    : 'https://popiai-server.youdao.com';
+    ? 'https://popi.yuanzoo.cn'
+    : 'https://popi.yuanzoo.cn';
 };
 
 export const getUpdateCheckUrl = (): string => (

@@ -646,8 +646,8 @@ const checkCalendarPermission = async (): Promise<string> => {
         : '';
       // Check if it's a permission error
       if (stderr.includes('不能获取对象') ||
-          stderr.includes('not authorized') ||
-          stderr.includes('Permission denied')) {
+        stderr.includes('not authorized') ||
+        stderr.includes('Permission denied')) {
         console.log('[Permissions] macOS Calendar access: not-determined (needs permission)');
         return 'not-determined';
       }
@@ -967,7 +967,7 @@ const ensureOpenClawRunningForCowork = async () => {
     // the gateway for token changes. Just wait for any in-flight refresh.
     if (pendingTokenRefresh) {
       console.log('[OpenClaw] ensureRunning: awaiting pending token refresh before proceeding');
-      await pendingTokenRefresh.catch(() => {});
+      await pendingTokenRefresh.catch(() => { });
     }
     return manager.getStatus();
   }
@@ -979,7 +979,7 @@ const ensureOpenClawRunningForCowork = async () => {
   // a fresh token rather than the stale one that triggered the refresh.
   if (pendingTokenRefresh) {
     console.log('[OpenClaw] ensureRunning: awaiting pending token refresh before gateway start');
-    await pendingTokenRefresh.catch(() => {});
+    await pendingTokenRefresh.catch(() => { });
   }
 
   // Ensure MCP bridge is started and config is synced before launching the gateway,
@@ -1110,7 +1110,7 @@ const getOpenClawConfigSync = (): OpenClawConfigSync => {
       getPopoInstances: () => {
         try {
           return getIMGatewayManager().getIMStore().getPopoInstances();
-          } catch {
+        } catch {
           return [];
         }
       },
@@ -1486,83 +1486,83 @@ const startMcpBridge = (): Promise<McpBridgeConfig | null> => {
     return mcpBridgeStartPromise;
   }
   mcpBridgeStartPromise = (async (): Promise<McpBridgeConfig | null> => {
-  try {
-    console.log('[McpBridge] startMcpBridge called');
+    try {
+      console.log('[McpBridge] startMcpBridge called');
 
-    // Discover MCP tools (may be empty if no servers configured)
-    const enabledServers = getMcpStore().getEnabledServers();
-    console.log(`[McpBridge] enabledServers: ${enabledServers.length} (${enabledServers.map(s => s.name).join(', ')})`);
+      // Discover MCP tools (may be empty if no servers configured)
+      const enabledServers = getMcpStore().getEnabledServers();
+      console.log(`[McpBridge] enabledServers: ${enabledServers.length} (${enabledServers.map(s => s.name).join(', ')})`);
 
-    let tools: Awaited<ReturnType<McpServerManager['startServers']>> = [];
-    if (enabledServers.length > 0) {
+      let tools: Awaited<ReturnType<McpServerManager['startServers']>> = [];
+      if (enabledServers.length > 0) {
+        if (!mcpServerManager) {
+          mcpServerManager = new McpServerManager();
+        }
+        console.log('[McpBridge] starting MCP servers...');
+        tools = await mcpServerManager.startServers(enabledServers);
+        console.log(`[McpBridge] tools discovered: ${tools.length}`);
+      }
+
+      // Always start HTTP callback server (serves both MCP Bridge and AskUserQuestion)
       if (!mcpServerManager) {
         mcpServerManager = new McpServerManager();
       }
-      console.log('[McpBridge] starting MCP servers...');
-      tools = await mcpServerManager.startServers(enabledServers);
-      console.log(`[McpBridge] tools discovered: ${tools.length}`);
-    }
+      if (!mcpBridgeServer) {
+        mcpBridgeServer = new McpBridgeServer(mcpServerManager, mcpBridgeSecret);
+      }
+      if (!mcpBridgeServer.port) {
+        console.log('[McpBridge] starting HTTP callback server...');
+        await mcpBridgeServer.start();
+      }
 
-    // Always start HTTP callback server (serves both MCP Bridge and AskUserQuestion)
-    if (!mcpServerManager) {
-      mcpServerManager = new McpServerManager();
-    }
-    if (!mcpBridgeServer) {
-      mcpBridgeServer = new McpBridgeServer(mcpServerManager, mcpBridgeSecret);
-    }
-    if (!mcpBridgeServer.port) {
-      console.log('[McpBridge] starting HTTP callback server...');
-      await mcpBridgeServer.start();
-    }
-
-    // Register AskUserQuestion callback — shows a permission modal when the
-    // ask-user-question OpenClaw plugin sends a request via HTTP.
-    mcpBridgeServer.onAskUser((request) => {
-      const windows = BrowserWindow.getAllWindows();
-      windows.forEach((win) => {
-        if (win.isDestroyed()) return;
-        try {
-          win.webContents.send('cowork:stream:permission', {
-            sessionId: '__askuser__',
-            request: {
-              requestId: request.requestId,
-              toolName: 'AskUserQuestion',
-              toolInput: { questions: request.questions },
-            },
-          });
-        } catch (error) {
-          console.error('[AskUser] failed to send permission request to window:', error);
-        }
+      // Register AskUserQuestion callback — shows a permission modal when the
+      // ask-user-question OpenClaw plugin sends a request via HTTP.
+      mcpBridgeServer.onAskUser((request) => {
+        const windows = BrowserWindow.getAllWindows();
+        windows.forEach((win) => {
+          if (win.isDestroyed()) return;
+          try {
+            win.webContents.send('cowork:stream:permission', {
+              sessionId: '__askuser__',
+              request: {
+                requestId: request.requestId,
+                toolName: 'AskUserQuestion',
+                toolInput: { questions: request.questions },
+              },
+            });
+          } catch (error) {
+            console.error('[AskUser] failed to send permission request to window:', error);
+          }
+        });
       });
-    });
 
-    // Dismiss the AskUser modal when timeout or resolved from server side.
-    // Simulate a deny response to remove it from the renderer's pending queue.
-    mcpBridgeServer.onAskUserDismiss((requestId) => {
-      const windows = BrowserWindow.getAllWindows();
-      windows.forEach((win) => {
-        if (win.isDestroyed()) return;
-        try {
-          win.webContents.send('cowork:stream:permissionDismiss', { requestId });
-        } catch {
-          // ignore
-        }
+      // Dismiss the AskUser modal when timeout or resolved from server side.
+      // Simulate a deny response to remove it from the renderer's pending queue.
+      mcpBridgeServer.onAskUserDismiss((requestId) => {
+        const windows = BrowserWindow.getAllWindows();
+        windows.forEach((win) => {
+          if (win.isDestroyed()) return;
+          try {
+            win.webContents.send('cowork:stream:permissionDismiss', { requestId });
+          } catch {
+            // ignore
+          }
+        });
       });
-    });
 
-    const callbackUrl = mcpBridgeServer.callbackUrl;
-    const askUserCallbackUrl = mcpBridgeServer.askUserCallbackUrl;
-    if (!callbackUrl || !askUserCallbackUrl) {
-      console.error('[McpBridge] failed to get callback URL');
+      const callbackUrl = mcpBridgeServer.callbackUrl;
+      const askUserCallbackUrl = mcpBridgeServer.askUserCallbackUrl;
+      if (!callbackUrl || !askUserCallbackUrl) {
+        console.error('[McpBridge] failed to get callback URL');
+        return null;
+      }
+
+      console.log(`[McpBridge] started: ${tools.length} MCP tools, callback=${callbackUrl}`);
+      return { callbackUrl, askUserCallbackUrl, secret: mcpBridgeSecret, tools };
+    } catch (error) {
+      console.error('[McpBridge] startup error:', error instanceof Error ? error.stack || error.message : String(error));
       return null;
     }
-
-    console.log(`[McpBridge] started: ${tools.length} MCP tools, callback=${callbackUrl}`);
-    return { callbackUrl, askUserCallbackUrl, secret: mcpBridgeSecret, tools };
-  } catch (error) {
-    console.error('[McpBridge] startup error:', error instanceof Error ? error.stack || error.message : String(error));
-    return null;
-  }
   })().finally(() => {
     mcpBridgeStartPromise = null;
   });
@@ -2281,12 +2281,12 @@ if (!gotTheLock) {
   /**
    * Helper: Persist auth tokens into the kv store.
    */
-  const saveAuthTokens = (accessToken: string, refreshToken: string) => {
-    getStore().set('auth_tokens', { accessToken, refreshToken });
+  const saveAuthTokens = (accessToken: string, refreshToken: string, apiKey: string = '') => {
+    getStore().set('auth_tokens', { accessToken, refreshToken, apiKey });
   };
 
-  const getAuthTokens = (): { accessToken: string; refreshToken: string } | null => {
-    return getStore().get<{ accessToken: string; refreshToken: string }>('auth_tokens') || null;
+  const getAuthTokens = (): { accessToken: string; refreshToken: string; apiKey: string; } | null => {
+    return getStore().get<{ accessToken: string; refreshToken: string; apiKey: string; }>('auth_tokens') || null;
   };
 
   const clearAuthTokens = () => {
@@ -2368,6 +2368,8 @@ if (!gotTheLock) {
     };
   };
 
+
+
   ipcMain.handle('auth:login', async (_event, { loginUrl }: { loginUrl?: string } = {}) => {
     try {
       const baseUrl = loginUrl || `${getServerApiBaseUrl()}/login`;
@@ -2379,6 +2381,75 @@ if (!gotTheLock) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to open login' };
     }
   });
+
+  ipcMain.handle('auth:smsLogin', async (_event, params: { code: string; phone: string; inviteCode?: string }) => {
+    try {
+      const baseUrl = `${getServerApiBaseUrl()}/api_client/auth/loginByCode`;
+      const resp = await net.fetch(baseUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+      const body = await resp.json();
+      console.log('[Auth] SMS login response:', body);
+      saveAuthTokens(body.data.token, '');
+      return { success: true, user: body.data.user };
+    } catch (error) {
+      console.error('[Auth] login failed:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to open login' };
+    }
+  });
+
+  ipcMain.handle('auth:passwordLogin', async (_event, params: { username: string; password: string }) => {
+    try {
+      const baseUrl = `${getServerApiBaseUrl()}/api_client/auth/login`;
+      const resp = await net.fetch(baseUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+      const body = await resp.json();
+      console.log('[Auth] SMS login response:', body);
+      saveAuthTokens(body.data.token, '');
+      return { success: true, user: body.data.user };
+    } catch (error) {
+      console.error('[Auth] login failed:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to open login' };
+    }
+  });
+
+  ipcMain.handle('auth:getCaptcha', async (_event) => {
+    try {
+      const baseUrl = `${getServerApiBaseUrl()}/api_client/captcha/gen`;
+      const resp = await net.fetch(baseUrl, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const body = await resp.json();
+      console.log('[Auth] getCaptcha:', body);
+      return { success: true, id: body.data.id, imgUrl: body.data.data };
+    } catch (error) {
+      console.error('[Auth] login failed:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to open login' };
+    }
+  });
+
+  ipcMain.handle('auth:sendSmsCode', async (_event, { phone, captchaId, captchaValue }: { phone: string; captchaId: string; captchaValue: string }) => {
+    try {
+      const baseUrl = `${getServerApiBaseUrl()}/api_client/auth/code?phone=${phone}&usage=LOGIN&captchaId=${captchaId}&captchaValue=${captchaValue}`;
+      const resp = await net.fetch(baseUrl, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const body = await resp.json();
+      console.log('[Auth] sendSmsCode:', body);
+      return { success: true, message: body.message };
+    } catch (error) {
+      console.error('[Auth] sendSmsCode failed:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to send SMS code' };
+    }
+  });
+
 
   ipcMain.handle('auth:exchange', async (_event, { code }: { code: string }) => {
     try {
@@ -2474,7 +2545,7 @@ if (!gotTheLock) {
       const tokens = getAuthTokens();
       if (tokens) {
         const serverBaseUrl = getServerApiBaseUrl();
-        await net.fetch(`${serverBaseUrl}/api/auth/logout`, {
+        await net.fetch(`${serverBaseUrl}/api_client/auth/logout`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${tokens.accessToken}` },
         }).catch(() => { /* best-effort */ });
@@ -2516,34 +2587,44 @@ if (!gotTheLock) {
 
   ipcMain.handle('auth:getModels', async () => {
     try {
-      const tokens = getAuthTokens();
-      if (!tokens) {
-        console.log('[Auth:getModels] No auth tokens available');
-        return { success: false };
-      }
-      const serverBaseUrl = getServerApiBaseUrl();
-      const url = `${serverBaseUrl}/api/models/available`;
-      console.log('[Auth:getModels] Fetching:', url);
-      const resp = await fetchWithAuth(url);
-      console.log('[Auth:getModels] Response status:', resp.status);
-      if (!resp.ok) {
-        console.log('[Auth:getModels] Response not ok:', resp.status, resp.statusText);
-        return { success: false };
-      }
-      const data = await resp.json() as { code: number; data: Array<{ modelId: string; modelName: string; provider: string; apiFormat: string; supportsImage?: boolean }> };
-      console.log('[Auth:getModels] Response data:', JSON.stringify(data).slice(0, 500));
-      if (data.code !== 0) return { success: false };
+      // const tokens = getAuthTokens();
+      // if (!tokens) {
+      //   console.log('[Auth:getModels] No auth tokens available');
+      //   return { success: false };
+      // }
+      // const serverBaseUrl = getServerApiBaseUrl();
+      // const url = `${serverBaseUrl}/api/models/available`;
+      // console.log('[Auth:getModels] Fetching:', url);
+      // const resp = await fetchWithAuth(url);
+      // console.log('[Auth:getModels] Response status:', resp.status);
+      // if (!resp.ok) {
+      //   console.log('[Auth:getModels] Response not ok:', resp.status, resp.statusText);
+      //   return { success: false };
+      // }
+      // const data = await resp.json() as { code: number; data: Array<{ modelId: string; modelName: string; provider: string; apiFormat: string; supportsImage?: boolean }> };
+      // console.log('[Auth:getModels] Response data:', JSON.stringify(data).slice(0, 500));
+      // if (data.code !== 0) return { success: false };
+      // todo：以后可以从服务端获取模型列表
+      const models = [
+        {
+          modelId: 'doubao-seed-2-0-mini-260428',
+          modelName: 'doubao-seed-2-0-mini-260428',
+          provider: 'popiai-server',
+          apiFormat: 'openai-completions',
+          supportsImage: false,
+        },
+      ]
       // Cache server model metadata for use in OpenClaw config sync (supportsImage, etc.)
-      const serverModelsChanged = updateServerModelMetadata(data.data);
+      const serverModelsChanged = updateServerModelMetadata(models);
       // Re-sync so the gateway picks up the correct supportsImage values for server models.
       // This IPC can run after normal chat completion when the renderer refreshes quota/model
       // state, so server model updates must not force a hard gateway restart.
       if (serverModelsChanged) {
-        syncOpenClawConfig({ reason: 'server-models-updated', restartGatewayIfRunning: false }).catch(() => {});
+        syncOpenClawConfig({ reason: 'server-models-updated', restartGatewayIfRunning: false }).catch(() => { });
       } else {
         console.debug('[Auth:getModels] server model metadata unchanged, skipping config sync');
       }
-      return { success: true, models: data.data };
+      return { success: true, models: models };
     } catch (e) {
       console.error('[Auth:getModels] Error:', e);
       return { success: false };
@@ -3852,7 +3933,7 @@ if (!gotTheLock) {
             MIN_MEMORY_USER_MEMORIES_MAX_ITEMS,
             Math.min(MAX_MEMORY_USER_MEMORIES_MAX_ITEMS, Math.floor(config.memoryUserMemoriesMaxItems))
           )
-        : undefined;
+          : undefined;
       const normalizedSkipMissedJobs = typeof config.skipMissedJobs === 'boolean'
         ? config.skipMissedJobs
         : undefined;
@@ -4269,7 +4350,7 @@ if (!gotTheLock) {
 
       if (instance.transport === 'imap') {
         // Test IMAP connection using node-imap
-         
+
         let Imap: new (config: Record<string, unknown>) => any;
         try {
           Imap = require('imap');
@@ -5285,9 +5366,9 @@ end tell'`, { timeout: 5000 });
           const message = darwinError instanceof Error ? darwinError.message : String(darwinError);
           const lowerErrorText = `${stderr}\n${message}`.toLowerCase();
           if (lowerErrorText.includes('not allowed assistive access') ||
-              lowerErrorText.includes('assistive') ||
-              lowerErrorText.includes('not authorized') ||
-              lowerErrorText.includes('1002')) {
+            lowerErrorText.includes('assistive') ||
+            lowerErrorText.includes('not authorized') ||
+            lowerErrorText.includes('1002')) {
             return { success: false, error: 'permission_denied' };
           }
           console.warn('[Voice] macOS dictation shortcut failed:', darwinError);
@@ -5646,14 +5727,14 @@ end tell'`, { timeout: 5000 });
       icon: getAppIconPath(),
       ...(isMac
         ? {
-            titleBarStyle: 'hiddenInset' as const,
-            trafficLightPosition: { x: 12, y: 20 },
-          }
+          titleBarStyle: 'hiddenInset' as const,
+          trafficLightPosition: { x: 12, y: 20 },
+        }
         : isWindows
           ? {
-              frame: false,
-              titleBarStyle: 'hidden' as const,
-            }
+            frame: false,
+            titleBarStyle: 'hidden' as const,
+          }
           : {
             titleBarStyle: 'hidden' as const,
             titleBarOverlay: getTitleBarOverlayOptions(),

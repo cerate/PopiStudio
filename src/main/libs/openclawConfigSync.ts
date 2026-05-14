@@ -571,12 +571,14 @@ const PROVIDER_REGISTRY: Record<string, ProviderDescriptor> = {
     providerId: OpenClawProviderId.PopiaiServer,
     resolveApi: () => OpenClawApiConst.OpenAICompletions as OpenClawProviderApi,
     normalizeBaseUrl: url => {
-      const proxyPort = getOpenClawTokenProxyPort();
-      return proxyPort ? `http://127.0.0.1:${proxyPort}/v1` : stripChatCompletionsSuffix(url);
+      // const proxyPort = getOpenClawTokenProxyPort();
+      // return proxyPort ? `http://127.0.0.1:${proxyPort}/v1` : stripChatCompletionsSuffix(url);
+      // console.info(`[OpenClawConfigSync] normalizeBaseUrl:`, url);
+      return 'https://llmapitest.popi.art/v1';
     },
     resolveApiKey: () => {
-      const proxyPort = getOpenClawTokenProxyPort();
-      return proxyPort ? '${LOBSTER_PROXY_TOKEN}' : `\${${providerApiKeyEnvVar('server')}}`;
+      // const proxyPort = getOpenClawTokenProxyPort();
+      return '${LOBSTER_APIKEY_SERVER}';
     },
   },
 

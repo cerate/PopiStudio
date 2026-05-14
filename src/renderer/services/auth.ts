@@ -1,3 +1,4 @@
+import { ProviderName } from '@shared/providers';
 import { store } from '../store';
 import { setAuthLoading, setLoggedIn, setLoggedOut, updateQuota, setProfileSummary } from '../store/slices/authSlice';
 import { setServerModels, clearServerModels } from '../store/slices/modelSlice';
@@ -61,6 +62,14 @@ class AuthService {
     await window.electron.auth.login(loginUrl);
   }
 
+  async smsLogin(params: { phone: string; code: string }) {
+    return await window.electron.auth.smsLogin(params);
+  }
+
+  async passwordLogin(params: { email: string; password: string }) {
+    return await window.electron.auth.passwordLogin(params);
+  }
+
   /**
    * Fetch login URL from overmind, fallback to Portal login page.
    */
@@ -100,6 +109,14 @@ class AuthService {
     } catch (e) {
       console.error('Auth callback failed:', e);
     }
+  }
+
+  getCaptcha() {
+    return window.electron.auth.getCaptcha();
+  }
+
+  sendSmsCode({ phone, captchaId, captchaValue }: { phone: string; captchaId: string; captchaValue: string }) {
+    return window.electron.auth.sendSmsCode({ phone, captchaId, captchaValue });
   }
 
   /**
@@ -162,7 +179,7 @@ class AuthService {
   /**
    * Load available models from server and dispatch to store.
    */
-  private async loadServerModels() {
+  async loadServerModels() {
     try {
       const modelsResult = await window.electron.auth.getModels();
       if (modelsResult.success && modelsResult.models) {
@@ -170,7 +187,7 @@ class AuthService {
           id: m.modelId,
           name: m.modelName,
           provider: m.provider,
-          providerKey: 'popiai-server',
+          providerKey: ProviderName.PopiaiServer,
           isServerModel: true,
           serverApiFormat: m.apiFormat,
           supportsImage: m.supportsImage ?? false,

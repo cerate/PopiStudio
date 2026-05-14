@@ -185,17 +185,17 @@ interface EmailConnectivityTestResult {
 
 type CoworkPermissionResult =
   | {
-      behavior: 'allow';
-      updatedInput?: Record<string, unknown>;
-      updatedPermissions?: Record<string, unknown>[];
-      toolUseID?: string;
-    }
+    behavior: 'allow';
+    updatedInput?: Record<string, unknown>;
+    updatedPermissions?: Record<string, unknown>[];
+    toolUseID?: string;
+  }
   | {
-      behavior: 'deny';
-      message: string;
-      interrupt?: boolean;
-      toolUseID?: string;
-    };
+    behavior: 'deny';
+    message: string;
+    interrupt?: boolean;
+    toolUseID?: string;
+  };
 
 interface McpServerConfigIPC {
   id: string;
@@ -871,6 +871,12 @@ interface IElectronAPI {
   };
   auth: {
     login: (loginUrl?: string) => Promise<{ success: boolean; error?: string }>;
+    smsLogin: (params: { phone: string; code: string }) => Promise<{ success: boolean; user: import('../../shared/user').UserProfile; error?: string }>;
+    passwordLogin: (params: { email: string; password: string }) => Promise<{
+      success: boolean; error?: string, user: import('../../shared/user').UserProfile;
+    }>;
+    getCaptcha: () => Promise<{ success: boolean; id: string; imgUrl: string, error?: string }>;
+    sendSmsCode: (params: { phone: string; captchaId: string; captchaValue: string }) => Promise<{ success: boolean; error?: string }>;
     exchange: (
       code: string,
     ) => Promise<{ success: boolean; user?: any; quota?: any; error?: string }>;
@@ -1588,4 +1594,4 @@ declare global {
   }
 }
 
-export {};
+export { };

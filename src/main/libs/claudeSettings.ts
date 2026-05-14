@@ -61,9 +61,9 @@ export function setStoreGetter(getter: () => SqliteStore | null): void {
 }
 
 // Auth token getter injected from main.ts for server model provider
-let authTokensGetter: (() => { accessToken: string; refreshToken: string } | null) | null = null;
+let authTokensGetter: (() => { accessToken: string; refreshToken: string, apiKey: string } | null) | null = null;
 
-export function setAuthTokensGetter(getter: () => { accessToken: string; refreshToken: string } | null): void {
+export function setAuthTokensGetter(getter: () => { accessToken: string; refreshToken: string, apiKey: string } | null): void {
   authTokensGetter = getter;
 }
 
@@ -514,11 +514,11 @@ export function resolveAllProviderApiKeys(): Record<string, string> {
   // popiai-server token is now managed by the token proxy
   // (openclawTokenProxy.ts) — no longer injected as an env var.
 
-    // popiai-server: uses auth accessToken
+    // popiai-server: uses auth apiKey
     const tokens = authTokensGetter?.();
     const serverBaseUrl = serverBaseUrlGetter?.();
-    if (tokens?.accessToken && serverBaseUrl) {
-      result.SERVER = tokens.accessToken;
+    if (tokens?.apiKey && serverBaseUrl) {
+      result.SERVER = tokens.apiKey;
     }
 
     // All configured custom providers
