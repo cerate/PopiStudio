@@ -1,6 +1,6 @@
 import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
-import React, { useCallback, useEffect, useMemo,useRef, useState } from 'react';
-import { useDispatch,useSelector } from 'react-redux';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 
 import {
   APP_UPDATE_HEARTBEAT_INTERVAL_MS,
@@ -44,6 +44,9 @@ import { setDraftPrompt } from './store/slices/coworkSlice';
 import { setAvailableModels, setDefaultSelectedModel } from './store/slices/modelSlice';
 import { clearSelection } from './store/slices/quickActionSlice';
 import type { CoworkPermissionResult } from './types/cowork';
+import Modal from './components/common/Modal';
+import LoginView from './components/login/LoginView';
+import { setIsShowLoginModal } from './store/slices/authSlice';
 
 const getOpenClawProviderIdForConfig = (
   providerName: string,
@@ -60,9 +63,12 @@ const INIT_STEP_TIMEOUT_MS_WINDOWS = 24_000;
 const INIT_STEP_TIMEOUT_MS_DEFAULT = 16_000;
 
 const App: React.FC = () => {
+  const { isShowLoginModal } = useSelector((state: RootState) => state.auth);
   const [showSettings, setShowSettings] = useState(false);
   const [settingsOptions, setSettingsOptions] = useState<SettingsOpenOptions>({});
-  const [mainView, setMainView] = useState<'cowork' | 'skills' | 'scheduledTasks' | 'mcp'>('cowork');
+  const [mainView, setMainView] = useState<'cowork' | 'skills' | 'scheduledTasks' | 'mcp'>(
+    'cowork',
+  );
   const [isInitialized, setIsInitialized] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -103,18 +109,18 @@ const App: React.FC = () => {
         }, timeoutMs);
 
         promise.then(
-          (value) => {
+          value => {
             window.clearTimeout(timer);
             resolve(value);
           },
-          (error) => {
+          error => {
             window.clearTimeout(timer);
             reject(error);
-          }
+          },
         );
       });
     },
-    []
+    [],
   );
 
   // 初始化应用
@@ -130,7 +136,11 @@ const App: React.FC = () => {
         const elapsed = Math.round(performance.now() - t0);
         const msg = `initializeApp: ${label} (+${elapsed}ms)`;
         console.info(`[App] ${msg}`);
-        try { window.electron?.log?.fromRenderer?.('info', 'App', msg); } catch { /* preload may not expose this yet */ }
+        try {
+          window.electron?.log?.fromRenderer?.('info', 'App', msg);
+        } catch {
+          /* preload may not expose this yet */
+        }
       };
 
       try {
@@ -167,21 +177,33 @@ const App: React.FC = () => {
         };
         apiService.setConfig(apiConfig);
 
-        const providerModels: { id: string; name: string; provider?: string; providerKey?: string; openClawProviderId?: string; supportsImage?: boolean }[] = [];
+        const providerModels: {
+          id: string;
+          name: string;
+          provider?: string;
+          providerKey?: string;
+          openClawProviderId?: string;
+          supportsImage?: boolean;
+        }[] = [];
         if (config.providers) {
           Object.entries(config.providers).forEach(([providerName, providerConfig]) => {
             if (providerConfig.enabled && providerConfig.models) {
-              const openClawProviderId = getOpenClawProviderIdForConfig(providerName, providerConfig);
-              providerConfig.models.forEach((model: { id: string; name: string; supportsImage?: boolean }) => {
-                providerModels.push({
-                  id: model.id,
-                  name: model.name,
-                  provider: getProviderDisplayName(providerName, providerConfig),
-                  providerKey: providerName,
-                  openClawProviderId,
-                  supportsImage: model.supportsImage ?? false,
-                });
-              });
+              const openClawProviderId = getOpenClawProviderIdForConfig(
+                providerName,
+                providerConfig,
+              );
+              providerConfig.models.forEach(
+                (model: { id: string; name: string; supportsImage?: boolean }) => {
+                  providerModels.push({
+                    id: model.id,
+                    name: model.name,
+                    provider: getProviderDisplayName(providerName, providerConfig),
+                    providerKey: providerName,
+                    openClawProviderId,
+                    supportsImage: model.supportsImage ?? false,
+                  });
+                },
+              );
             }
           });
         }
@@ -195,10 +217,13 @@ const App: React.FC = () => {
         if (resolvedModels.length > 0) {
           dispatch(setAvailableModels(resolvedModels));
           const allModels = store.getState().model.availableModels;
-          const preferredModel = allModels.find(
-            model => model.id === config.model.defaultModel
-              && (!config.model.defaultModelProvider || model.providerKey === config.model.defaultModelProvider)
-          ) ?? allModels[0];
+          const preferredModel =
+            allModels.find(
+              model =>
+                model.id === config.model.defaultModel &&
+                (!config.model.defaultModelProvider ||
+                  model.providerKey === config.model.defaultModelProvider),
+            ) ?? allModels[0];
           dispatch(setDefaultSelectedModel(preferredModel));
         }
         mark('model resolution done');
@@ -210,16 +235,21 @@ const App: React.FC = () => {
         setIsInitialized(true);
         mark('shell ready');
 
-        void waitWithTimeout(scheduledTaskService.init(), 5000, 'scheduledTaskService.init').catch((error) => {
-          console.error('[App] initializeApp: scheduledTaskService.init failed:', error);
-        });
-
+        void waitWithTimeout(scheduledTaskService.init(), 5000, 'scheduledTaskService.init').catch(
+          error => {
+            console.error('[App] initializeApp: scheduledTaskService.init failed:', error);
+          },
+        );
       } catch (error) {
         const elapsed = Math.round(performance.now() - t0);
         const msg = error instanceof Error ? error.message : String(error);
         const detail = `initializeApp FAILED after ${elapsed}ms: ${msg}`;
         console.error(`[App] ${detail}`);
-        try { window.electron?.log?.fromRenderer?.('error', 'App', detail); } catch { /* best-effort */ }
+        try {
+          window.electron?.log?.fromRenderer?.('error', 'App', detail);
+        } catch {
+          /* best-effort */
+        }
         setInitError(i18nService.t('initializationError'));
         setIsInitialized(true);
       }
@@ -230,7 +260,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const unsubscribe = i18nService.subscribe(() => {
-      forceLanguageRefresh((prev) => prev + 1);
+      forceLanguageRefresh(prev => prev + 1);
     });
     return () => {
       unsubscribe();
@@ -284,8 +314,8 @@ const App: React.FC = () => {
     if (!isInitialized || !defaultSelectedModel?.id) return;
     const config = configService.getConfig();
     if (
-      config.model.defaultModel === defaultSelectedModel.id
-      && (config.model.defaultModelProvider ?? '') === (defaultSelectedModel.providerKey ?? '')
+      config.model.defaultModel === defaultSelectedModel.id &&
+      (config.model.defaultModelProvider ?? '') === (defaultSelectedModel.providerKey ?? '')
     ) {
       return;
     }
@@ -323,7 +353,7 @@ const App: React.FC = () => {
   }, []);
 
   const handleToggleSidebar = useCallback(() => {
-    setIsSidebarCollapsed((prev) => !prev);
+    setIsSidebarCollapsed(prev => !prev);
   }, []);
 
   const handleNewChat = useCallback(() => {
@@ -333,9 +363,11 @@ const App: React.FC = () => {
     dispatch(clearSelection());
     setMainView('cowork');
     window.setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('cowork:focus-input', {
-        detail: { clear: shouldClearInput },
-      }));
+      window.dispatchEvent(
+        new CustomEvent('cowork:focus-input', {
+          detail: { clear: shouldClearInput },
+        }),
+      );
     }, 0);
   }, [dispatch, mainView, currentSessionId]);
 
@@ -374,7 +406,7 @@ const App: React.FC = () => {
 
     void loadInitialUpdateState();
 
-    const unsubscribe = window.electron.appUpdate.onStateChanged((state) => {
+    const unsubscribe = window.electron.appUpdate.onStateChanged(state => {
       const previousStatus = previousUpdateStatusRef.current;
       previousUpdateStatusRef.current = state.status;
       setAppUpdateState(state);
@@ -382,7 +414,7 @@ const App: React.FC = () => {
       if (state.status === AppUpdateStatus.Ready && previousStatus !== AppUpdateStatus.Ready) {
         if (shouldInstallReadyUpdateRef.current && state.readyFilePath) {
           shouldInstallReadyUpdateRef.current = false;
-          void window.electron.appUpdate.installReady().then((installResult) => {
+          void window.electron.appUpdate.installReady().then(installResult => {
             if (!installResult.success) {
               showToast(installResult.error || i18nService.t('updateInstallFailed'));
             }
@@ -436,7 +468,10 @@ const App: React.FC = () => {
       return;
     }
 
-    if (appUpdateState.status === AppUpdateStatus.Error || appUpdateState.status === AppUpdateStatus.Available) {
+    if (
+      appUpdateState.status === AppUpdateStatus.Error ||
+      appUpdateState.status === AppUpdateStatus.Available
+    ) {
       const isManualUrl = updateInfo.url.includes('#') || updateInfo.url.endsWith('/download-list');
       if (!isManualUrl) {
         shouldInstallReadyUpdateRef.current = appUpdateState.status === AppUpdateStatus.Available;
@@ -503,10 +538,13 @@ const App: React.FC = () => {
     handleShowSettings({ initialTab: 'model' });
   }, [handleShowSettings]);
 
-  const handlePermissionResponse = useCallback(async (result: CoworkPermissionResult) => {
-    if (!pendingPermission) return;
-    await coworkService.respondToPermission(pendingPermission.requestId, result);
-  }, [pendingPermission]);
+  const handlePermissionResponse = useCallback(
+    async (result: CoworkPermissionResult) => {
+      if (!pendingPermission) return;
+      await coworkService.respondToPermission(pendingPermission.requestId, result);
+    },
+    [pendingPermission],
+  );
 
   const handleCloseSettings = () => {
     setShowSettings(false);
@@ -517,20 +555,29 @@ const App: React.FC = () => {
     });
 
     if (config.providers) {
-      const allModels: { id: string; name: string; provider?: string; providerKey?: string; openClawProviderId?: string; supportsImage?: boolean }[] = [];
+      const allModels: {
+        id: string;
+        name: string;
+        provider?: string;
+        providerKey?: string;
+        openClawProviderId?: string;
+        supportsImage?: boolean;
+      }[] = [];
       Object.entries(config.providers).forEach(([providerName, providerConfig]) => {
         if (providerConfig.enabled && providerConfig.models) {
           const openClawProviderId = getOpenClawProviderIdForConfig(providerName, providerConfig);
-          providerConfig.models.forEach((model: { id: string; name: string; supportsImage?: boolean }) => {
-            allModels.push({
-              id: model.id,
-              name: model.name,
-              provider: getProviderDisplayName(providerName, providerConfig),
-              providerKey: providerName,
-              openClawProviderId,
-              supportsImage: model.supportsImage ?? false,
-            });
-          });
+          providerConfig.models.forEach(
+            (model: { id: string; name: string; supportsImage?: boolean }) => {
+              allModels.push({
+                id: model.id,
+                name: model.name,
+                provider: getProviderDisplayName(providerName, providerConfig),
+                providerKey: providerName,
+                openClawProviderId,
+                supportsImage: model.supportsImage ?? false,
+              });
+            },
+          );
         }
       });
       if (allModels.length > 0) {
@@ -643,7 +690,9 @@ const App: React.FC = () => {
       const now = Date.now();
       if (lastCheckTime > 0 && now - lastCheckTime < APP_UPDATE_POLL_INTERVAL_MS) return;
       lastCheckTime = now;
-      console.log(`[App] auto update check triggered, reason=${reason}, at=${new Date(now).toISOString()}`);
+      console.log(
+        `[App] auto update check triggered, reason=${reason}, at=${new Date(now).toISOString()}`,
+      );
       await runUpdateCheck();
     };
 
@@ -692,10 +741,7 @@ const App: React.FC = () => {
 
     // 其他情况使用原有的权限模态框
     return (
-      <CoworkPermissionModal
-        permission={pendingPermission}
-        onRespond={handlePermissionResponse}
-      />
+      <CoworkPermissionModal permission={pendingPermission} onRespond={handlePermissionResponse} />
     );
   }, [pendingPermission, handlePermissionResponse]);
 
@@ -777,9 +823,7 @@ const App: React.FC = () => {
 
   return (
     <div className="h-screen overflow-hidden flex flex-col bg-surface-raised">
-      {toastMessage && (
-        <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
-      )}
+      {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <Sidebar
           onShowLogin={handleShowLogin}
@@ -823,7 +867,9 @@ const App: React.FC = () => {
               />
             ) : (
               <CoworkView
-                onRequestAppSettings={privacyAgreed === true && !showWelcome ? handleShowSettings : undefined}
+                onRequestAppSettings={
+                  privacyAgreed === true && !showWelcome ? handleShowSettings : undefined
+                }
                 onShowSkills={handleShowSkills}
                 isSidebarCollapsed={isSidebarCollapsed}
                 onToggleSidebar={handleToggleSidebar}
@@ -849,7 +895,10 @@ const App: React.FC = () => {
         <AppUpdateModal
           updateState={appUpdateState}
           onCancel={() => {
-            if (appUpdateState.status !== AppUpdateStatus.Downloading && appUpdateState.status !== AppUpdateStatus.Installing) {
+            if (
+              appUpdateState.status !== AppUpdateStatus.Downloading &&
+              appUpdateState.status !== AppUpdateStatus.Installing
+            ) {
               setShowUpdateModal(false);
             }
           }}
@@ -860,10 +909,15 @@ const App: React.FC = () => {
       )}
       {permissionModal}
       {privacyAgreed === false && (
-        <PrivacyDialog
-          onAccept={handlePrivacyAccept}
-          onReject={handlePrivacyReject}
-        />
+        <PrivacyDialog onAccept={handlePrivacyAccept} onReject={handlePrivacyReject} />
+      )}
+      {isShowLoginModal && (
+        <Modal
+          onClose={() => dispatch(setIsShowLoginModal(false))}
+          className="w-[400px] bg-surface rounded-xl shadow-popover border border-border overflow-hidden"
+        >
+          <LoginView onClose={() => dispatch(setIsShowLoginModal(false))} />
+        </Modal>
       )}
       {showWelcome && (
         <WelcomeDialog
@@ -876,4 +930,4 @@ const App: React.FC = () => {
   );
 };
 
-export default App; 
+export default App;

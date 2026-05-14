@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 
 import { authService } from '../services/auth';
 import { i18nService } from '../services/i18n';
 import { RootState } from '../store';
-import type { CreditItem } from '../store/slices/authSlice';
+import { setIsShowLoginModal, type CreditItem } from '../store/slices/authSlice';
 import UserAvatarIcon from './icons/UserAvatarIcon';
 
 const getSubscriptionBadge = (label: string) => {
@@ -18,8 +18,16 @@ const getSubscriptionBadge = (label: string) => {
       bg: 'bg-gradient-to-r from-amber-500 to-yellow-400',
       text: 'text-white',
       icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="shrink-0">
-          <path d="M2 4l3 12h14l3-12-5 4-5-6-5 6z" /><path d="M5 16l-1.5 4h17L19 16" />
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="10"
+          height="10"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          className="shrink-0"
+        >
+          <path d="M2 4l3 12h14l3-12-5 4-5-6-5 6z" />
+          <path d="M5 16l-1.5 4h17L19 16" />
         </svg>
       ),
     };
@@ -29,7 +37,18 @@ const getSubscriptionBadge = (label: string) => {
       bg: 'bg-gradient-to-r from-purple-500 to-violet-400',
       text: 'text-white',
       icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="10"
+          height="10"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="shrink-0"
+        >
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
         </svg>
       ),
@@ -40,7 +59,14 @@ const getSubscriptionBadge = (label: string) => {
       bg: 'bg-gradient-to-r from-blue-500 to-cyan-400',
       text: 'text-white',
       icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="shrink-0">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="10"
+          height="10"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          className="shrink-0"
+        >
           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
         </svg>
       ),
@@ -74,24 +100,21 @@ const CreditItemRow: React.FC<{ item: CreditItem; isEn: boolean }> = ({ item, is
     <div className="flex flex-col gap-0.5 py-1.5 first:pt-0 last:pb-0">
       <div className="flex items-center gap-1.5">
         {badge ? (
-          <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${badge.bg} ${badge.text}`}>
+          <span
+            className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${badge.bg} ${badge.text}`}
+          >
             {badge.icon}
             {label}
           </span>
         ) : (
-          <span className="text-xs text-secondary">
-            {label}
-          </span>
+          <span className="text-xs text-secondary">{label}</span>
         )}
         <span className="text-xs font-medium text-foreground">
-          {formatCredits(item.creditsRemaining)}{i18nService.t('authCreditsUnit')}
+          {formatCredits(item.creditsRemaining)}
+          {i18nService.t('authCreditsUnit')}
         </span>
       </div>
-      {expiresText && (
-        <span className="text-[10px] text-secondary pl-0.5">
-          {expiresText}
-        </span>
-      )}
+      {expiresText && <span className="text-[10px] text-secondary pl-0.5">{expiresText}</span>}
     </div>
   );
 };
@@ -134,11 +157,7 @@ const UserMenu: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         <div className="text-sm font-medium text-foreground truncate">
           {user?.nickname || phoneSuffix}
         </div>
-        {phoneSuffix && (
-          <div className="text-xs text-secondary mt-0.5">
-            ****{phoneSuffix}
-          </div>
-        )}
+        {phoneSuffix && <div className="text-xs text-secondary mt-0.5">****{phoneSuffix}</div>}
       </div>
 
       {/* Credits section - collapsible */}
@@ -148,12 +167,11 @@ const UserMenu: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           onClick={() => setCreditsExpanded(!creditsExpanded)}
           className="w-full px-4 py-2.5 flex items-center justify-between cursor-pointer hover:bg-surface-raised transition-colors"
         >
-          <span className="text-xs text-secondary">
-            {i18nService.t('authCreditsRemaining')}
-          </span>
+          <span className="text-xs text-secondary">{i18nService.t('authCreditsRemaining')}</span>
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-medium text-foreground">
-              {formatCredits(totalCredits)}{i18nService.t('authCreditsUnit')}
+              {formatCredits(totalCredits)}
+              {i18nService.t('authCreditsUnit')}
             </span>
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -182,9 +200,7 @@ const UserMenu: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 ))}
               </div>
             ) : (
-              <div className="text-xs text-secondary py-1">
-                {i18nService.t('authZeroCredits')}
-              </div>
+              <div className="text-xs text-secondary py-1">{i18nService.t('authZeroCredits')}</div>
             )}
             <button
               type="button"
@@ -211,7 +227,18 @@ const UserMenu: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           onClick={handleLogout}
           className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-surface-raised transition-colors cursor-pointer flex items-center gap-2"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="shrink-0"
+          >
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
             <polyline points="16 17 21 12 16 7" />
             <line x1="21" y1="12" x2="9" y2="12" />
@@ -225,6 +252,7 @@ const UserMenu: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
 const LoginButton: React.FC = () => {
   const { isLoggedIn, isLoading, user } = useSelector((state: RootState) => state.auth);
+  const dispatch = useDispatch();
   const [showMenu, setShowMenu] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -247,10 +275,12 @@ const LoginButton: React.FC = () => {
   }
 
   const handleClick = async () => {
+
     if (isLoggedIn) {
       setShowMenu(!showMenu);
     } else {
-      await authService.login();
+      dispatch(setIsShowLoginModal(true));
+      // await authService.login();
     }
   };
 

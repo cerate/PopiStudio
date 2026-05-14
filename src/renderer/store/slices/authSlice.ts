@@ -35,6 +35,7 @@ export interface ProfileSummary {
 }
 
 interface AuthState {
+  isShowLoginModal: boolean;
   isLoggedIn: boolean;
   isLoading: boolean;
   user: UserProfile | null;
@@ -43,6 +44,7 @@ interface AuthState {
 }
 
 const initialState: AuthState = {
+  isShowLoginModal: true,
   isLoggedIn: false,
   isLoading: true,
   user: null,
@@ -63,6 +65,9 @@ const authSlice = createSlice({
       state.user = action.payload.user;
       state.quota = action.payload.quota;
     },
+    setIsShowLoginModal(state, action: PayloadAction<boolean>) {
+      state.isShowLoginModal = action.payload;
+    },
     setLoggedOut(state) {
       state.isLoggedIn = false;
       state.isLoading = false;
@@ -79,5 +84,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { setAuthLoading, setLoggedIn, setLoggedOut, updateQuota, setProfileSummary } = authSlice.actions;
+export const { setAuthLoading, setLoggedIn, setLoggedOut,setIsShowLoginModal, updateQuota, setProfileSummary } = authSlice.actions;
 export default authSlice.reducer;
